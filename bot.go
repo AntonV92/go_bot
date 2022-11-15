@@ -18,7 +18,7 @@ const (
 var currencies = map[string]bool{
 	"USD": true,
 	"EUR": true,
-	"KZT": true,
+	"KGS": true,
 }
 
 type Valute struct {
@@ -31,21 +31,21 @@ type ValCurs struct {
 	Valute []Valute
 }
 
-func main() {
+var report ValCurs
 
-	var report ValCurs
+func main() {
 
 	resp, err := http.Get(CbrUrl)
 
 	if err != nil {
-		fmt.Printf("%s\n", err)
+		writeLog(err.Error())
 	}
 
 	data, err := ioutil.ReadAll(resp.Body)
 	resp.Body.Close()
 
 	if err != nil {
-		fmt.Printf("%s\n", err)
+		writeLog(err.Error())
 	}
 
 	regex := regexp.MustCompile("<\\?xml.*?>")
@@ -55,15 +55,20 @@ func main() {
 	out, decodeErr := decoder.String(string(data))
 
 	if decodeErr != nil {
-		fmt.Printf("Decode error: %s", decodeErr)
+		writeLog(decodeErr.Error())
 	}
 
 	resultData := regex.ReplaceAllString(out, "")
 
 	xml.Unmarshal([]byte(resultData), &report)
 
+	message := ""
+
 	for _, v := range report.Valute {
-		fmt.Printf("Code: %s\tNominal: %s\t Value: %s\n", v.CharCode, v.Nominal, v.Value)
+		if currencies[v.CharCode] {
+			message += fmt.Sprintf("%s:\tNominal: %s\t Value: %s\n", v.CharCode, v.Nominal, v.Value)
+		}
 	}
 
+	sendMessage(message)
 }
