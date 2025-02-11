@@ -3,9 +3,10 @@ package main
 import (
 	"encoding/xml"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"regexp"
+	"strings"
 
 	"golang.org/x/text/encoding/charmap"
 )
@@ -13,6 +14,7 @@ import (
 const (
 	CbrUrl    = "https://cbr.ru/scripts/XML_daily.asp"
 	BotApiUrl = "https://api.telegram.org/bot"
+	UserAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 14.2; rv:122.0) Gecko/20100101 Firefox/122.0"
 )
 
 var currencies = map[string]bool{
@@ -22,9 +24,10 @@ var currencies = map[string]bool{
 }
 
 type Valute struct {
-	CharCode string
-	Nominal  string
-	Value    string
+	CharCode  string
+	Nominal   string
+	Value     string
+	VunitRate string
 }
 
 type ValCurs struct {
@@ -35,13 +38,18 @@ var report ValCurs
 
 func main() {
 
-	resp, err := http.Get(CbrUrl)
+	client := http.Client{}
+	req, _ := http.NewRequest("GET", CbrUrl, nil)
+	req.Header.Add("User-Agent", UserAgent)
+
+	resp, err := client.Do(req)
 
 	if err != nil {
 		writeLog(err.Error())
 	}
 
-	data, err := ioutil.ReadAll(resp.Body)
+	data, err := io.ReadAll(resp.Body)
+
 	resp.Body.Close()
 
 	if err != nil {
@@ -66,7 +74,12 @@ func main() {
 
 	for _, v := range report.Valute {
 		if currencies[v.CharCode] {
-			message += fmt.Sprintf("%s:\tNominal: %s\t Value: %s\n", v.CharCode, v.Nominal, v.Value)
+
+			costParts := strings.Split(v.VunitRate, ",")
+			costParts[1] = costParts[1][:2]
+			finCost := strings.Join(costParts, ".")
+
+			message += fmt.Sprintf("%s:\t %s\n", v.CharCode, finCost)
 		}
 	}
 
